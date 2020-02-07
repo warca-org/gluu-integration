@@ -5,6 +5,7 @@ TODO:
  * Fill profile for Client on login
  * Update profiles on login
  * Make Gluu URL configurable
+ * Make login button configurable
  * Remove password auth
  * Remove user creation
  */
@@ -47,12 +48,17 @@ class GluuStaffAuthBackend extends ExternalStaffAuthenticationBackend {
 
     function __construct($config) {
         $this->config = $config;
-        $this->warca = new GluuAuth($config);
+        $this->gluu = new GluuAuth($config);
     }
 
     function signOn() {
-        // TODO: Check session for auth token
-        if (isset($_SESSION[':oauth']['email'])) {
+        if (isset($_SESSION[':oauth']['email']) && isset($_SESSION[':oauth']['access_token'])) {
+            if (
+                !isset($_SESSION[':oauth']['profile']['member_of']) ||
+                !in_array('inum=' . $this->config->get('g-staff-inum') . ',ou=groups,o=gluu',$_SESSION[':oauth']['profile']['member_of'])) {
+                    $_SESSION['_staff']['auth']['msg'] = __('Access denied');
+                    return new AccessDenied(__('Access denied'));
+            }
             if (($staff = StaffSession::lookup(array('email' => $_SESSION[':oauth']['email'])))
                 && $staff->getId()
             ) {
@@ -69,20 +75,30 @@ class GluuStaffAuthBackend extends ExternalStaffAuthenticationBackend {
 
     static function signOut($user) {
         parent::signOut($user);
+        $location = 'https://iam.warca.net/oxauth/restv1/end_session?'.http_build_query(array(
+            'id_token_hint' => $_SESSION[':oauth']['access_token'],
+            'post_logout_redirect_uri' => 'https://' . $_SERVER['HTTP_HOST'] . ROOT_PATH . 'scp/'
+        ));
+        header("Location: $location");
         unset($_SESSION[':oauth']);
+        exit();
     }
 
 
     function triggerAuth() {
         parent::triggerAuth();
-        $warca = $this->warca->triggerAuth();
-        $warca->GET(
+        $gluu = $this->gluu->triggerAuth();
+        $token = $this->gluu->access_token;
+        $gluu->GET(
             "https://iam.warca.net/oxauth/restv1/userinfo?access_token="
-                . $this->warca->access_token)
-            ->then(function($response) {
+                . urlencode($token))
+            ->then(function($response) use ($token) {
                 require_once INCLUDE_DIR . 'class.json.php';
-                if ($json = JsonDataParser::decode($response->text))
+                if ($json = JsonDataParser::decode($response->text)) {
                     $_SESSION[':oauth']['email'] = $json['email'];
+                    $_SESSION[':oauth']['profile'] = $json;
+                    $_SESSION[':oauth']['access_token'] = $token;
+                }
                 Http::redirect(ROOT_PATH . 'scp');
             }
         );
@@ -98,7 +114,7 @@ class GluuClientAuthBackend extends ExternalUserAuthenticationBackend {
 
     function __construct($config) {
         $this->config = $config;
-        $this->warca = new GluuAuth($config);
+        $this->gluu = new GluuAuth($config);
     }
 
     function supportsInteractiveAuthentication() {
@@ -106,8 +122,7 @@ class GluuClientAuthBackend extends ExternalUserAuthenticationBackend {
     }
 
     function signOn() {
-        // TODO: Check session for auth token
-        if (isset($_SESSION[':oauth']['email'])) {
+        if (isset($_SESSION[':oauth']['email']) && isset($_SESSION[':oauth']['access_token'])) {
             if (($acct = ClientAccount::lookupByUsername($_SESSION[':oauth']['email']))
                     && $acct->getId()
                     && ($client = new ClientSession(new EndUser($acct->getUser()))))
@@ -138,12 +153,12 @@ class GluuClientAuthBackend extends ExternalUserAuthenticationBackend {
     function triggerAuth() {
         require_once INCLUDE_DIR . 'class.json.php';
         parent::triggerAuth();
-        $warca = $this->warca->triggerAuth();
-        $token = $this->warca->access_token;
-        $warca->GET(
+        $gluu = $this->gluu->triggerAuth();
+        $token = $this->gluu->access_token;
+        $gluu->GET(
             "https://iam.warca.net/oxauth/restv1/userinfo?access_token="
-                . $token)
-            ->then(function($response) use ($warca, $token) {
+                . urlencode($token))
+            ->then(function($response) use ($token) {
                 if (!($json = JsonDataParser::decode($response->text)))
                     return;
                 $_SESSION[':oauth']['email'] = $json['email'];

@@ -10,13 +10,13 @@ class OauthAuthPlugin extends Plugin {
         $config = $this->getConfig();
 
         # ----- Warca ---------------------
-        $warca = $config->get('g-enabled');
-        if (in_array($warca, array('all', 'staff'))) {
+        $gluu = $config->get('g-enabled');
+        if (in_array($gluu, array('all', 'staff'))) {
             require_once('gluu.php');
             StaffAuthenticationBackend::register(
                 new GluuStaffAuthBackend($this->getConfig()));
         }
-        if (in_array($warca, array('all', 'client'))) {
+        if (in_array($gluu, array('all', 'client'))) {
             require_once('gluu.php');
             UserAuthenticationBackend::register(
                 new GluuClientAuthBackend($this->getConfig()));

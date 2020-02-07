@@ -39,6 +39,10 @@ class OauthPluginConfig extends PluginConfig {
                 'label' => $__('Client Secret'),
                 'configuration' => array('size'=>60, 'length'=>100),
             )),
+            'g-staff-inum' => new TextboxField(array(
+                'label' => $__('Inum of staff group'),
+                'configuration' => array('size'=>60, 'length'=>100),
+            )),
             'g-enabled' => clone $modes,
         );
     }
