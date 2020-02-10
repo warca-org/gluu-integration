@@ -43,6 +43,14 @@ class OauthPluginConfig extends PluginConfig {
                 'label' => $__('Inum of staff group'),
                 'configuration' => array('size'=>60, 'length'=>100),
             )),
+            'g-admin-inum'  => new TextboxField(array(
+                'label' => $__('Inum of admin group'),
+                'configuration' => array('size'=>60, 'length'=>100),
+            )),
+            'g-staff-initial-role' => new ChoiceField(array(
+                'label' => $__('Initial role for new staff accounts'),
+                'choices'=> Role::getActiveRoles(),
+            )),
             'g-enabled' => clone $modes,
         );
     }
